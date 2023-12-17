@@ -1,0 +1,15 @@
+CMakeFile*
+clangd
+CMakeCache.txt
+Makefile
+*.cmake
+compile_commands.json
+build
+.clangd
+bin
+.vscode
+*.vim
+*.log
+main
+packet
+__pycache*
