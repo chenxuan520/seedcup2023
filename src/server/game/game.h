@@ -73,9 +73,12 @@ private:
   bool IsCreateWall(Pos pos);
   void PrintMap();
   RC InitMap();
+  RC InitPlayerBirth();
+  RC InitCustomMap();
 
 private:
   std::vector<std::vector<std::shared_ptr<Area>>> map_;
+  std::vector<Pos> player_birth_;
   std::unordered_map<ID, std::shared_ptr<Player>> player_map_;
   std::unordered_map<ID, std::shared_ptr<BlockBase>> block_map_;
   std::unordered_map<ID, std::shared_ptr<Bomb>> bomb_map_;

@@ -1,8 +1,8 @@
 {
   "game_max_round": 1200,
-  "game_print_map": false,
+  "game_print_map": true,
   "game_print_map_ascii": false,
-  "map_size": 15,
+  "map_size": 5,
   "player_num": 2,
   "player_hp": 1,
   "player_max_hp": 3,
@@ -29,8 +29,15 @@
   "server_max_connection_num": 10,
   "epoll_max_events_num": 100,
   "epoll_timeout": 10,
-  "log_print_stdout": true,
+  "log_print_stdout": false,
 
   "host": "0.0.0.0",
-  "port": 9999
+  "port": 9999,
+  "custom_map":[
+    ["1","e","_","0","_"],
+    ["9","f","_","a","_"],
+    ["9","g","_","b","_"],
+    ["9","6","_","c","_"],
+    ["9","6","_","d","_"]
+  ]
 }

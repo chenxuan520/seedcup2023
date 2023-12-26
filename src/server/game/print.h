@@ -93,13 +93,13 @@ public:
       } else if (kIsGamePrintMapAscii) {
         icon_type = ASCII_ICON;
 
-        potion_to_print[BOMB_RANGE] = "a ";
-        potion_to_print[BOMB_NUM] = "b ";
+        potion_to_print[BOMB_NUM] = "a ";
+        potion_to_print[BOMB_RANGE] = "b ";
         potion_to_print[INVINCIBLE] = "c ";
-        potion_to_print[SHIELD] = "d ";
-        potion_to_print[REBIRTH] = "e ";
-        potion_to_print[SPEED] = "b ";
-        potion_to_print[GLOVES] = "c ";
+        potion_to_print[REBIRTH] = "d ";
+        potion_to_print[SHIELD] = "e ";
+        potion_to_print[SPEED] = "f ";
+        potion_to_print[GLOVES] = "g ";
         player_to_print[0] = "0 ";
         player_to_print[1] = "1 ";
         player_to_print[2] = "2 ";

@@ -1,6 +1,7 @@
 #include "game.h"
 #include "block/block_factory.h"
 #include "const.h"
+#include "custom_map.h"
 #include "potion/potion_factory.h"
 #include "print.h"
 #include "random.h"
@@ -30,19 +31,104 @@ ID Game::CreateBlock(Pos pos, BlockType block_type) {
 }
 
 RC Game::Init() {
-  // 打印出来效果太丑了,因此考虑不打印
-  // if (kIsGamePrintMap) {
-  //   Print::PrintConst();
-  // }
   if (game_status_ != UNINIT) {
     logger_->warn("game engine has init");
     return INVALUE_OPER;
   }
+  if (kIsExistCustomMap) {
+    // 自定义地图
+    auto rc = InitCustomMap();
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    game_status_ = GameStatus::WAIT_PLAYER;
+    return RC::SUCCESS;
+  }
+
   auto rc = InitMap();
   if (rc != RC::SUCCESS) {
     return rc;
   }
+  rc = InitPlayerBirth();
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
   game_status_ = GameStatus::WAIT_PLAYER;
+  return RC::SUCCESS;
+}
+
+RC Game::InitCustomMap() {
+  ASSERT(kMapDefaultSize % 2 != 0);
+  map_.resize(kMapDefaultSize,
+              std::vector<std::shared_ptr<Area>>(kMapDefaultSize, nullptr));
+  player_birth_.resize(4, {0, 0});
+
+  if (game_status_ != UNINIT) {
+    logger_->warn("game engine has init");
+    return INVALUE_OPER;
+  }
+  std::vector<std::vector<std::string>> custom_map;
+  auto &instance = CustomMap::GetInstance();
+  auto rc = instance.GetCustomMap(custom_map);
+  if (rc != 0) {
+    logger_->warn("get custom map failed,error reason:{}",
+                  instance.GetLastError());
+    return RC::INVALUS_CUSTOM_MAP;
+  }
+  if (custom_map.size() != kMapDefaultSize) {
+    logger_->warn("custom map size error,should be {}*{}", kMapDefaultSize,
+                  kMapDefaultSize);
+    return RC::INVALUS_CUSTOM_MAP;
+  }
+  for (int i = 0; i < kMapDefaultSize; i++) {
+    for (int j = 0; j < kMapDefaultSize; j++) {
+      Pos pos{i, j};
+      map_[i][j] = std::make_shared<Area>(pos);
+
+      auto &print = custom_map[i][j];
+
+      if (instance.IsPotionPrint(print)) {
+        auto potion_type = instance.GetPotionTypeByPrint(print);
+        map_[i][j]->set_potion_type(potion_type);
+
+      } else if (instance.IsBlockPrint(print)) {
+        auto block_type = instance.GetBlockTypeByPrint(print);
+        map_[i][j]->set_block_id(CreateBlock({i, j}, block_type));
+
+      } else if (instance.IsEmptyPrint(print)) {
+        continue;
+
+      } else if (instance.IsPlayerPrint(print)) {
+        auto player_birth_id = instance.GetPlayerIDByPrint(print);
+        if (player_birth_id < 0 || player_birth_id > 3) {
+          logger_->warn("custom map print error,unknown player id:{},error:{}",
+                        player_birth_id, instance.GetLastError());
+          return RC::INVALUS_CUSTOM_MAP;
+        }
+        player_birth_[player_birth_id] = {i, j};
+
+      } else {
+        logger_->warn("custom map print error,unknown print:{}", print);
+        return RC::INVALUS_CUSTOM_MAP;
+      }
+    }
+  }
+  if (player_birth_.size() == 0) {
+    logger_->warn("player birth area is empty");
+    return RC::INVALUS_CUSTOM_MAP;
+  }
+  return RC::SUCCESS;
+}
+
+RC Game::InitPlayerBirth() {
+  player_birth_.resize(4, {0, 0});
+  // 初始化
+  player_birth_[0] = {0, 0};
+  player_birth_[1] = {kMapDefaultSize - 1, kMapDefaultSize - 1};
+  player_birth_[2] = {kMapDefaultSize - 1, 0};
+  player_birth_[3] = {0, kMapDefaultSize - 1};
+  // 插入前随机位置
+  std::random_shuffle(player_birth_.begin(), player_birth_.end());
   return RC::SUCCESS;
 }
 
@@ -85,7 +171,6 @@ RC Game::InitMap() {
 }
 
 RC Game::AddPlayer(ID &player_id, const std::string &player_name) {
-  static std::vector<Pos> player_bitrh;
   if (game_status_ != WAIT_PLAYER) {
     logger_->warn("game_status is {} not waiting player", game_status_);
     return RC::INVALUE_OPER;
@@ -95,18 +180,9 @@ RC Game::AddPlayer(ID &player_id, const std::string &player_name) {
                   kPlayerDefaultNum);
     return RC::PLAYER_TOO_MUCH;
   }
-  if (player_bitrh.size() == 0) {
-    // 初始化
-    player_bitrh.push_back({0, 0});
-    player_bitrh.push_back({kMapDefaultSize - 1, kMapDefaultSize - 1});
-    player_bitrh.push_back({kMapDefaultSize - 1, 0});
-    player_bitrh.push_back({0, kMapDefaultSize - 1});
-  }
-  if (player_map_.size() == 0) {
-    // 插入前随机位置
-    std::random_shuffle(player_bitrh.begin(), player_bitrh.end());
-  }
-  auto play_pos = player_bitrh[player_map_.size()];
+
+  ASSERT(player_map_.size() < player_birth_.size());
+  auto play_pos = player_birth_[player_map_.size()];
   player_id = CreatePlayer(play_pos, player_name);
   map_[play_pos.first][play_pos.second]->players().insert(player_id);
   logger_->debug("player {} add success in {},{}", player_id, play_pos.first,
