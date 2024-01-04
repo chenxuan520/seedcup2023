@@ -1,9 +1,11 @@
 #include "game.h"
 #include "block/block_factory.h"
 #include "const.h"
+#include "custom_map.h"
 #include "potion/potion_factory.h"
 #include "print.h"
 #include "random.h"
+#include "snapshot.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -30,19 +32,110 @@ ID Game::CreateBlock(Pos pos, BlockType block_type) {
 }
 
 RC Game::Init() {
-  // 打印出来效果太丑了,因此考虑不打印
-  // if (kIsGamePrintMap) {
-  //   Print::PrintConst();
-  // }
   if (game_status_ != UNINIT) {
     logger_->warn("game engine has init");
     return INVALUE_OPER;
   }
+  if (kIsExistCustomMap) {
+    // 自定义地图
+    auto rc = InitCustomMap();
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    game_status_ = GameStatus::WAIT_PLAYER;
+    return RC::SUCCESS;
+  }
+
   auto rc = InitMap();
   if (rc != RC::SUCCESS) {
     return rc;
   }
+  rc = InitPlayerBirth();
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
   game_status_ = GameStatus::WAIT_PLAYER;
+  return RC::SUCCESS;
+}
+
+RC Game::InitWithCustomMap(
+    const std::vector<std::vector<std::string>> &custom_map) {
+  if (custom_map.size() != kMapDefaultSize) {
+    logger_->warn("custom map size error,should be {}*{}", kMapDefaultSize,
+                  kMapDefaultSize);
+    return RC::INVALUS_CUSTOM_MAP;
+  }
+  auto &instance = CustomMap::GetInstance();
+  for (int i = 0; i < kMapDefaultSize; i++) {
+    for (int j = 0; j < kMapDefaultSize; j++) {
+      Pos pos{i, j};
+      map_[i][j] = std::make_shared<Area>(pos);
+
+      auto &print = custom_map[i][j];
+
+      if (instance.IsPotionPrint(print)) {
+        auto potion_type = instance.GetPotionTypeByPrint(print);
+        map_[i][j]->set_potion_type(potion_type);
+
+      } else if (instance.IsBlockPrint(print)) {
+        auto block_type = instance.GetBlockTypeByPrint(print);
+        map_[i][j]->set_block_id(CreateBlock({i, j}, block_type));
+
+      } else if (instance.IsEmptyPrint(print)) {
+        continue;
+
+      } else if (instance.IsPlayerPrint(print)) {
+        auto player_birth_id = instance.GetPlayerIDByPrint(print);
+        if (player_birth_id < 0 || player_birth_id > 3) {
+          logger_->warn("custom map print error,unknown player id:{},error:{}",
+                        player_birth_id, instance.GetLastError());
+          return RC::INVALUS_CUSTOM_MAP;
+        }
+        player_birth_[player_birth_id] = {i, j};
+
+      } else {
+        logger_->warn("custom map print error,unknown print:{}", print);
+        return RC::INVALUS_CUSTOM_MAP;
+      }
+    }
+  }
+  if (player_birth_.size() == 0) {
+    logger_->warn("player birth area is empty");
+    return RC::INVALUS_CUSTOM_MAP;
+  }
+  return RC::SUCCESS;
+}
+
+RC Game::InitCustomMap() {
+  ASSERT(kMapDefaultSize % 2 != 0);
+  map_.resize(kMapDefaultSize,
+              std::vector<std::shared_ptr<Area>>(kMapDefaultSize, nullptr));
+  player_birth_.resize(4, {0, 0});
+
+  if (game_status_ != UNINIT) {
+    logger_->warn("game engine has init");
+    return INVALUE_OPER;
+  }
+  std::vector<std::vector<std::string>> custom_map;
+  auto &instance = CustomMap::GetInstance();
+  auto rc = instance.GetCustomMap(custom_map);
+  if (rc != 0) {
+    logger_->warn("get custom map failed,error reason:{}",
+                  instance.GetLastError());
+    return RC::INVALUS_CUSTOM_MAP;
+  }
+  return InitWithCustomMap(custom_map);
+}
+
+RC Game::InitPlayerBirth() {
+  player_birth_.resize(4, {0, 0});
+  // 初始化
+  player_birth_[0] = {0, 0};
+  player_birth_[1] = {kMapDefaultSize - 1, kMapDefaultSize - 1};
+  player_birth_[2] = {kMapDefaultSize - 1, 0};
+  player_birth_[3] = {0, kMapDefaultSize - 1};
+  // 插入前随机位置
+  std::random_shuffle(player_birth_.begin(), player_birth_.end());
   return RC::SUCCESS;
 }
 
@@ -85,7 +178,6 @@ RC Game::InitMap() {
 }
 
 RC Game::AddPlayer(ID &player_id, const std::string &player_name) {
-  static std::vector<Pos> player_bitrh;
   if (game_status_ != WAIT_PLAYER) {
     logger_->warn("game_status is {} not waiting player", game_status_);
     return RC::INVALUE_OPER;
@@ -95,18 +187,9 @@ RC Game::AddPlayer(ID &player_id, const std::string &player_name) {
                   kPlayerDefaultNum);
     return RC::PLAYER_TOO_MUCH;
   }
-  if (player_bitrh.size() == 0) {
-    // 初始化
-    player_bitrh.push_back({0, 0});
-    player_bitrh.push_back({kMapDefaultSize - 1, kMapDefaultSize - 1});
-    player_bitrh.push_back({kMapDefaultSize - 1, 0});
-    player_bitrh.push_back({0, kMapDefaultSize - 1});
-  }
-  if (player_map_.size() == 0) {
-    // 插入前随机位置
-    std::random_shuffle(player_bitrh.begin(), player_bitrh.end());
-  }
-  auto play_pos = player_bitrh[player_map_.size()];
+
+  ASSERT(player_map_.size() < player_birth_.size());
+  auto play_pos = player_birth_[player_map_.size()];
   player_id = CreatePlayer(play_pos, player_name);
   map_[play_pos.first][play_pos.second]->players().insert(player_id);
   logger_->debug("player {} add success in {},{}", player_id, play_pos.first,
@@ -115,6 +198,11 @@ RC Game::AddPlayer(ID &player_id, const std::string &player_name) {
   if (player_map_.size() == kPlayerDefaultNum) {
     logger_->debug("player is enough");
     game_status_ = WAIT_ACTION;
+
+    // 初始化快照
+    std::string snapshot_str = "";
+    Snapshot::GetFromatStringWithMap(map_, snapshot_str);
+    logger_->debug("init snapshot:{}", snapshot_str);
   }
   PrintMap();
   return RC::SUCCESS;
@@ -142,8 +230,9 @@ RC Game::DealPlaceAction(Action action) {
   // step1:生成炸弹,放炸弹
   auto bomb_id = CreateBomb(pos, player->bomb_range(), player->play_id());
   area->set_bomb_id(bomb_id);
-  logger_->debug("player_id {} place a bomb {} in {},{}", player_id, bomb_id,
-                 pos.first, pos.second);
+  logger_->debug("player_id {} place a bomb {} in {},{} {}", player_id, bomb_id,
+                 pos.first, pos.second,
+                 SnapshotString(SNAPSHOT_BOMB_APPEAR, bomb_id, pos));
 
   // step2:增加目前投放炸弹数量
   player->set_bomb_now_num(player->bomb_now_num() + 1);
@@ -242,12 +331,15 @@ RC Game::DealMoveAction(Action action) {
     // 消除方块上的道具
     area->set_potion_type(PotionType::NO_POTION);
 
-    logger_->debug("player {} pick up potion {},get mark {}", player_id,
-                   potion->GetPotionType(), add_mark);
+    logger_->debug("player {} pick up potion {},get mark {} {}", player_id,
+                   potion->GetPotionType(), add_mark,
+                   SnapshotString(SNAPSHOT_POTION_DISAPPREAR, 0, pos));
   }
 
-  logger_->debug("player {} move to {},{} success", player_id, pos.first,
-                 pos.second);
+  logger_->debug("player {} move to {},{} success {}{}", player_id, pos.first,
+                 pos.second,
+                 SnapshotString(SNAPSHOT_PLAYER_DISAPPREAR, player_id, old_pos),
+                 SnapshotString(SNAPSHOT_PLAYER_APPEAR, player_id, pos));
   return RC::SUCCESS;
 }
 
@@ -336,7 +428,8 @@ RC Game::FlushTime(std::vector<ID> &win_players_id) {
   } else {
     game_status_ = WAIT_ACTION;
   }
-  logger_->debug("flush time success");
+  logger_->debug("flush time success {}",
+                 SnapshotString(SNAPSHOT_FLUSH, 0, {0, 0}));
   PrintMap();
   return RC::SUCCESS;
 }
@@ -404,6 +497,10 @@ RC Game::FlushBombMove() {
     map_[old_pos.first][old_pos.second]->set_bomb_id(-1);
     map_[bomb_pos.first][bomb_pos.second]->set_bomb_id(bomb->bomb_id());
     bomb->set_pos(bomb_pos);
+    logger_->debug("bomb {} move to {},{} {}{}", bomb->bomb_id(),
+                   bomb_pos.first, bomb_pos.second,
+                   SnapshotString(SNAPSHOT_BOMB_DISAPPREAR, 0, old_pos),
+                   SnapshotString(SNAPSHOT_BOMB_APPEAR, 0, bomb_pos));
   }
   return RC::SUCCESS;
 }
@@ -427,8 +524,9 @@ RC Game::FlushBombExplode() {
     auto bomb = bomb_map_[bomb_id];
     auto pos = bomb->pos();
     auto range = bomb->bomb_range();
-    logger_->debug("bomb explosion in {},{} range {}", pos.first, pos.second,
-                   range);
+    logger_->debug("bomb explosion in {},{} range {} {}", pos.first, pos.second,
+                   range,
+                   SnapshotString(SNAPSHOT_BOMB_DISAPPREAR, bomb_id, pos));
 
     // step1:清除炸弹
     CleanBomb(bomb_id);
@@ -462,7 +560,8 @@ RC Game::FlushBombExplode() {
       // 炸道具
       if (area->potion_type() != NO_POTION) {
         area->set_potion_type(NO_POTION);
-        logger_->debug("potion in {},{} disappeared", x, y);
+        logger_->debug("potion in {},{} disappeared {}", x, y,
+                       SnapshotString(SNAPSHOT_POTION_DISAPPREAR, 0, {x, y}));
       }
       // 炸方块
       if (area->block_id() != -1) {
@@ -473,7 +572,10 @@ RC Game::FlushBombExplode() {
           area->set_potion_type(result.second);
           // 清除方块
           CleanBLock(area->block_id());
-          logger_->debug("block in {},{} disappeared", x, y);
+          logger_->debug(
+              "block in {},{} disappeared {}{}", x, y,
+              SnapshotString(SNAPSHOT_BLOCK_DISAPPREAR, 0, {x, y}),
+              SnapshotString(SNAPSHOT_POTION_APPEAR, result.second, {x, y}));
         }
         return true;
       }
@@ -537,7 +639,9 @@ bool Game::IsGameOver(std::vector<ID> &win_players_id) {
       alive_num++;
       alive_player_id = player->play_id();
     } else {
-      logger_->debug("player {} is dead", player->play_id());
+      logger_->debug("player {} is dead {}", player->play_id(),
+                     SnapshotString(SNAPSHOT_PLAYER_DISAPPREAR,
+                                    player->play_id(), player->pos()));
       // 清理死人
       CleanPlayer(player->play_id());
     }
@@ -632,6 +736,16 @@ int Game::ProbabilityCreate() {
 
 void Game::PrintMap() {
   if (kIsGamePrintMap) {
-    Print::PrintMap();
+    Print::GetInstance().PrintMap(*this);
   }
+}
+
+std::string Game::SnapshotString(SnapshotEventType event_type, int affect_id,
+                                 const std::pair<int, int> &pos) {
+  if (kIsSnapshot) {
+    std::string result;
+    Snapshot::GetFormatString(event_type, affect_id, pos, result);
+    return result;
+  }
+  return "";
 }

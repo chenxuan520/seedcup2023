@@ -36,7 +36,10 @@ int getch(void) {
 int main() {
   auto &game = Game::GetInstance();
   while (1) {
-    Game::GetInstance().Init();
+    auto rc = Game::GetInstance().Init();
+    if (rc != RC::SUCCESS) {
+      return -1;
+    }
     vector<ID> player_ids(kPlayerDefaultNum, -1);
     for (int i = 0; i < kPlayerDefaultNum; i++) {
       Game::GetInstance().AddPlayer(player_ids[i]);

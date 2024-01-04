@@ -5,6 +5,7 @@
 #include "bomb.h"
 #include "logger.h"
 #include "random.h"
+#include "snapshot.h"
 #include <cstdlib>
 #include <memory>
 #include <spdlog/logger.h>
@@ -45,6 +46,7 @@ public:
   }
 
   RC Init();
+  RC InitWithCustomMap(const std::vector<std::vector<std::string>> &custom_map);
   RC AddPlayer(ID &player_id, const std::string &player_name = "unknown");
   RC AddAction(Action action);
   // win_players_id 为获胜者的ids
@@ -72,10 +74,15 @@ private:
   bool IsGameOver(std::vector<ID> &win_players_id);
   bool IsCreateWall(Pos pos);
   void PrintMap();
+  std::string SnapshotString(SnapshotEventType event_type, int affect_id,
+                             const std::pair<int, int> &pos);
   RC InitMap();
+  RC InitPlayerBirth();
+  RC InitCustomMap();
 
 private:
   std::vector<std::vector<std::shared_ptr<Area>>> map_;
+  std::vector<Pos> player_birth_;
   std::unordered_map<ID, std::shared_ptr<Player>> player_map_;
   std::unordered_map<ID, std::shared_ptr<BlockBase>> block_map_;
   std::unordered_map<ID, std::shared_ptr<Bomb>> bomb_map_;
