@@ -8,8 +8,8 @@ TEST(Snapshot, GetFormatString) {
   Snapshot snapshot;
   std::string result;
   std::vector<int> affect_arr_id;
-  snapshot.GetFormatString(SnapshotEventType::SNAPSHOT_PLAYER_APPEAR,
-                           0, {0, 0}, result);
+  snapshot.GetFormatString(SnapshotEventType::SNAPSHOT_PLAYER_APPEAR, 0, {0, 0},
+                           result);
   MUST_EQUAL(result, "<0 0 [0 0]>");
 }
 
@@ -66,23 +66,19 @@ TEST(Snapshot, Comprehensive) {
   snapshot.GetFormatString(SNAPSHOT_BOMB_APPEAR, 0, {0, 1}, temp);
   result += temp;
 
-  snapshot.GetFormatString(SNAPSHOT_PLAYER_DISAPPREAR, player_id,
-                           {0, 1}, temp);
+  snapshot.GetFormatString(SNAPSHOT_PLAYER_DISAPPREAR, player_id, {0, 1}, temp);
   result += temp;
 
-  snapshot.GetFormatString(SNAPSHOT_PLAYER_APPEAR, player_id, {0, 2},
-                           temp);
+  snapshot.GetFormatString(SNAPSHOT_PLAYER_APPEAR, player_id, {0, 2}, temp);
   result += temp;
 
   snapshot.GetFormatString(SNAPSHOT_FLUSH, 0, {0, 0}, temp);
   result += temp;
 
-  snapshot.GetFormatString(SNAPSHOT_PLAYER_DISAPPREAR, player_id,
-                           {0, 2}, temp);
+  snapshot.GetFormatString(SNAPSHOT_PLAYER_DISAPPREAR, player_id, {0, 2}, temp);
   result += temp;
 
-  snapshot.GetFormatString(SNAPSHOT_PLAYER_APPEAR, player_id, {0, 3},
-                           temp);
+  snapshot.GetFormatString(SNAPSHOT_PLAYER_APPEAR, player_id, {0, 3}, temp);
   result += temp;
 
   snapshot.GetFormatString(SNAPSHOT_FLUSH, 0, {0, 0}, temp);
@@ -96,7 +92,7 @@ TEST(Snapshot, Comprehensive) {
   Print::GetInstance().PrintSnapshot(snapshot.GetNowSnapshot(),
                                      snapshot.GetNowRound());
 
-  rc=snapshot.NextRound(err_msg);
+  rc = snapshot.NextRound(err_msg);
   MUST_EQUAL(err_msg, "");
   MUST_EQUAL(rc, 0);
 
@@ -107,7 +103,7 @@ TEST(Snapshot, Comprehensive) {
   // MUST_EQUAL(err_msg, "");
   // MUST_EQUAL(rc, 0);
 
-  rc=snapshot.LastRound(err_msg);
+  rc = snapshot.LastRound(err_msg);
   MUST_EQUAL(err_msg, "");
   MUST_EQUAL(rc, 0);
 

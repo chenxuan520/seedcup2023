@@ -1,5 +1,5 @@
-#include "game/snapshot.h"
 #include "game/print.h"
+#include "game/snapshot.h"
 #include <termio.h>
 using namespace std;
 
@@ -69,14 +69,14 @@ int main(int argc, char *argv[]) {
       }
       break;
     case 's':
-      rc=snapshot.NextStep(err_msg);
+      rc = snapshot.NextStep(err_msg);
       if (rc != 0) {
         cout << "NextStep failed: " << err_msg << endl;
         return 0;
       }
       break;
     case 'w':
-      rc=snapshot.LastStep(err_msg);
+      rc = snapshot.LastStep(err_msg);
       if (rc != 0) {
         cout << "LastStep failed: " << err_msg << endl;
         return 0;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     }
     Print::GetInstance().PrintSnapshot(snapshot.GetNowSnapshot(),
                                        snapshot.GetNowRound());
-    cout<<endl;
+    cout << endl;
   }
   return 0;
 }

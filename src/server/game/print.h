@@ -43,8 +43,8 @@ public:
              << "\nwall_random:" << kWallDefaultRandom << std::endl);
   }
 
-  void
-  PrintSnapshot(const std::vector<std::vector<std::shared_ptr<Area>>> &map,int now_round) {
+  void PrintSnapshot(const std::vector<std::vector<std::shared_ptr<Area>>> &map,
+                     int now_round) {
     for (int i = 0; i < map.size() + 2; i++) {
       PRINTOUT(boundary_to_print_);
     }
