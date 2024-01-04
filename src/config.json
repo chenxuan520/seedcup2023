@@ -2,7 +2,8 @@
   "game_max_round": 1200,
   "game_print_map": true,
   "game_print_map_ascii": false,
-  "map_size": 5,
+  "game_snapshot": true,
+  "map_size": 13,
   "player_num": 2,
   "player_hp": 1,
   "player_max_hp": 3,
@@ -18,7 +19,7 @@
   "mark_pick_potion": 100,
   "mark_bomb_mud": 10,
   "potion_probability": 50,
-  "mud_num": 100,
+  "mud_num": 70,
   "wall_random": 25,
   "seed_random": 0,
   "result_path": "result.json",
@@ -32,12 +33,5 @@
   "log_print_stdout": false,
 
   "host": "0.0.0.0",
-  "port": 9999,
-  "custom_map":[
-    ["1","e","_","0","_"],
-    ["9","f","_","a","_"],
-    ["9","g","_","b","_"],
-    ["9","6","_","c","_"],
-    ["9","6","_","d","_"]
-  ]
+  "port": 9999
 }

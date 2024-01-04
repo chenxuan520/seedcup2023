@@ -63,6 +63,7 @@ const bool kIsGamePrintMapAscii =
     Config::get_instance().get<bool>("game_print_map_ascii");
 const bool kIsLogPrintStdout =
     Config::get_instance().get<bool>("log_print_stdout");
+const bool kIsSnapshot = Config::get_instance().get<bool>("game_snapshot");
 const int kIncrMaxID = 10000000;
 const bool kIsExistCustomIcon =
     Config::get_instance().get_json().contains("custom_icon");

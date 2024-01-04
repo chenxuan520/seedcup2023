@@ -25,8 +25,10 @@ set(EXECUTABLE_OUTPUT_PATH ../../bin)
 
 add_executable(server ./main.cpp ${DIR_SRCS})
 add_executable(term ./term_main.cpp ${DIR_SRCS})
+add_executable(snapshot ./snapshot_main.cpp ${DIR_SRCS})
 
 # link lib
 find_package(fmt)
 target_link_libraries(server fmt::fmt)
 target_link_libraries(term fmt::fmt)
+target_link_libraries(snapshot fmt::fmt)
