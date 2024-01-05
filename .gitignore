@@ -5,7 +5,6 @@ Makefile
 *.cmake
 compile_commands.json
 build
-.clangd
 bin
 .vscode
 *.vim
