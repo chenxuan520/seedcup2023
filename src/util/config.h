@@ -54,6 +54,19 @@ private:
     }
     config_ = json::parse(f);
   }
+
+  void update_config() {
+    if (path == "") {
+      path = "../config.json";
+    }
+
+    std::ifstream f(path);
+    if (!f.good()) {
+      std::cerr << "path: " << path << " doesn't exist" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    config_ = json::parse(f);
+  }
 };
 
 inline std::pair<std::string, uint16_t>

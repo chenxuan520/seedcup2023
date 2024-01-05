@@ -27,10 +27,11 @@ int getch(void) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    cout << "Usage: " << argv[0] << " <snapshot_file>" << endl;
+  if (argc < 2) {
+    cout << "Usage: " << argv[0] << " <snapshot_file> " << endl;
     return 0;
   }
+
   string filename = argv[1];
   Snapshot snapshot;
   string err_msg;
@@ -49,6 +50,11 @@ int main(int argc, char *argv[]) {
     cout << "Init failed: " << err_msg << endl;
     return 0;
   }
+  cout << "Init success" << endl;
+  cout << "Press 'w' to last step, 's' to next step, 'a' to last round, 'd' or "
+          "' ' to "
+          "next round, 'q' to quit"
+       << endl;
   while (snapshot.GetStatusMachineStatus() ==
          Snapshot::STATUS_MACHINE_STATUS_NORMAL) {
     auto ch = getch();

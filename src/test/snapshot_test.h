@@ -30,16 +30,16 @@ TEST(Snapshot, GetFromatStringWithMap) {
   row.clear();
 
   snapshot.GetFromatStringWithMap(map, result);
-  MUST_EQUAL(result, "<{\"map\":[\"21\"]}>");
+  MUST_EQUAL(result, "<{\"map\":[\"50\"]}>");
 }
 
 TEST(Snapshot, Init) {
   Snapshot snapshot;
   std::string err_msg;
-  std::string log_str = "<{\"map\":[\"21\",\"12\"]}> <1 0 [0 0]> <2 0 [0 0]>";
+  std::string log_str = "<{\"map\":[\"04\",\"65\"]}> <1 0 [0 0]> <0 0 [0 1]>";
   auto rc = snapshot.Init(log_str, err_msg);
-  MUST_EQUAL(rc, 0);
   MUST_EQUAL(err_msg, "");
+  MUST_EQUAL(rc, 0);
   auto map = snapshot.GetNowSnapshot();
   MUST_EQUAL(map.size(), 2);
   Print::GetInstance().PrintSnapshot(snapshot.GetNowSnapshot(),
@@ -83,6 +83,8 @@ TEST(Snapshot, Comprehensive) {
 
   snapshot.GetFormatString(SNAPSHOT_FLUSH, 0, {0, 0}, temp);
   result += temp;
+  snapshot.GetFormatString(SNAPSHOT_FLUSH, 0, {0, 0}, temp);
+  result += temp;
 
   std::string err_msg;
   auto rc = snapshot.Init(result, err_msg);
@@ -99,9 +101,9 @@ TEST(Snapshot, Comprehensive) {
   Print::GetInstance().PrintSnapshot(snapshot.GetNowSnapshot(),
                                      snapshot.GetNowRound());
 
-  // rc=snapshot.NextRound(err_msg);
-  // MUST_EQUAL(err_msg, "");
-  // MUST_EQUAL(rc, 0);
+  rc=snapshot.NextRound(err_msg);
+  MUST_EQUAL(err_msg, "");
+  MUST_EQUAL(rc, 0);
 
   rc = snapshot.LastRound(err_msg);
   MUST_EQUAL(err_msg, "");
