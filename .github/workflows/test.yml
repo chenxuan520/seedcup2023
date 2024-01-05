@@ -2,7 +2,7 @@ name: test
 on:
   push: #设置触发规则
     branches:
-      - master
+      - main
 
 jobs:
   build:
