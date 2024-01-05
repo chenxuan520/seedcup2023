@@ -69,15 +69,22 @@ public:
           case MAP_OBJECT_BLOCK:
             area->set_block_id(1);
             break;
-          case MAP_OBJECT_PLAYER:
-            area->players().insert(1);
+          case MAP_OBJECT_PLAYER_0:
+          case MAP_OBJECT_PLAYER_1:
+          case MAP_OBJECT_PLAYER_2:
+          case MAP_OBJECT_PLAYER_3:
+            area->players().insert(map_str[i][j] - '0');
             break;
           case MAP_OBJECT_EMPTY:
             break;
           case MAP_OBJECT_UNKNOWN:
             break;
+          case MAP_OBJECT_BOMB:
+            area->set_bomb_id(1);
+            break;
           default:
-            err_msg = "map_str is invalid";
+            err_msg =
+                "map_str is invalid " + std::to_string((char)map_str[i][j]);
             return -1;
           }
           state_machine_[i].push_back(area);
@@ -202,7 +209,7 @@ public:
         if (map[i][j]->block_id() != -1) {
           arr_str[i] += std::to_string(MAP_OBJECT_BLOCK);
         } else if (map[i][j]->players().size() != 0) {
-          arr_str[i] += std::to_string(MAP_OBJECT_PLAYER);
+          arr_str[i] += std::to_string(*(map[i][j]->players().begin()) % 4);
         } else if (map[i][j]->bomb_id() == -1 &&
                    map[i][j]->potion_type() == NO_POTION) {
           arr_str[i] += std::to_string(MAP_OBJECT_EMPTY);
@@ -225,10 +232,14 @@ public:
 
 private:
   enum MapObjectType {
-    MAP_OBJECT_EMPTY = 0,
-    MAP_OBJECT_PLAYER = 1,
-    MAP_OBJECT_BLOCK = 2,
-    MAP_OBJECT_UNKNOWN = 3,
+    MAP_OBJECT_PLAYER_0 = 0,
+    MAP_OBJECT_PLAYER_1 = 1,
+    MAP_OBJECT_PLAYER_2 = 2,
+    MAP_OBJECT_PLAYER_3 = 3,
+    MAP_OBJECT_EMPTY = 4,
+    MAP_OBJECT_BLOCK = 5,
+    MAP_OBJECT_BOMB = 6,
+    MAP_OBJECT_UNKNOWN = 7,
   };
 
 private:
@@ -321,7 +332,8 @@ private:
       is_round = true;
       break;
     case SNAPSHOT_PLAYER_DISAPPREAR:
-      this->state_machine_[oper_pos.first][oper_pos.second]->players().clear();
+      this->state_machine_[oper_pos.first][oper_pos.second]->players().erase(
+          oper_id % 4);
       is_round = false;
       break;
     case SNAPSHOT_BLOCK_DISAPPREAR:
@@ -339,7 +351,7 @@ private:
       break;
     case SNAPSHOT_PLAYER_APPEAR:
       this->state_machine_[oper_pos.first][oper_pos.second]->players().insert(
-          MAP_OBJECT_PLAYER);
+          oper_id % 4);
       is_round = false;
       break;
     case SNAPSHOT_BOMB_APPEAR:

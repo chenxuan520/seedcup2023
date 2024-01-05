@@ -33,7 +33,8 @@ int getch(void) {
 
   return ch;
 }
-int main() {
+int main(int argc, char *argv[]) {
+
   auto &game = Game::GetInstance();
   while (1) {
     auto rc = Game::GetInstance().Init();

@@ -22,7 +22,7 @@ void signal_handler(int /*signal_num*/) {
   exit(0);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   signal(SIGINT, signal_handler);
 
   Config &config = Config::get_instance();

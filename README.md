@@ -10,6 +10,7 @@
 
 ## 目录说明
 ```shell
+
 .
 ├── LICENSE
 ├── README.md
@@ -28,6 +29,7 @@
     │   │   │   └── wall.h
     │   │   ├── bomb.h
     │   │   ├── const.h
+    │   │   ├── custom_map.h
     │   │   ├── game.cpp
     │   │   ├── game.h
     │   │   ├── player.h
@@ -41,14 +43,24 @@
     │   │   │   ├── rebirth_potion.h
     │   │   │   ├── shield_potion.h
     │   │   │   └── speed_potion.h
-    │   │   └── print.h
+    │   │   ├── print.h
+    │   │   └── snapshot.h
     │   ├── main.cpp
     │   ├── net
     │   │   ├── api.cpp
     │   │   ├── api.h
     │   │   ├── server.cpp
     │   │   └── server.h
+    │   ├── README.md
+    │   ├── snapshot_main.cpp
     │   └── term_main.cpp
+    ├── test
+    │   ├── main
+    │   ├── main.cpp
+    │   ├── Makefile
+    │   ├── README.md
+    │   ├── snapshot_test.h
+    │   └── test.h
     └── util
         ├── config.cpp
         ├── config.h
@@ -89,3 +101,5 @@
 - [x] ~~添加地图的初始化设置功能,方便测试~~
 
 - [x] ~~增加快照功能方便回溯~~
+
+- [ ] 完善自动化测试,使用github-cicd

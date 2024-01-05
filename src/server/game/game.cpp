@@ -333,7 +333,8 @@ RC Game::DealMoveAction(Action action) {
 
     logger_->debug("player {} pick up potion {},get mark {} {}", player_id,
                    potion->GetPotionType(), add_mark,
-                   SnapshotString(SNAPSHOT_POTION_DISAPPREAR, 0, pos));
+                   SnapshotString(SNAPSHOT_POTION_DISAPPREAR,
+                                  potion->GetPotionType(), pos));
   }
 
   logger_->debug("player {} move to {},{} success {}{}", player_id, pos.first,
@@ -559,9 +560,10 @@ RC Game::FlushBombExplode() {
       }
       // 炸道具
       if (area->potion_type() != NO_POTION) {
-        area->set_potion_type(NO_POTION);
         logger_->debug("potion in {},{} disappeared {}", x, y,
-                       SnapshotString(SNAPSHOT_POTION_DISAPPREAR, 0, {x, y}));
+                       SnapshotString(SNAPSHOT_POTION_DISAPPREAR,
+                                      area->potion_type(), {x, y}));
+        area->set_potion_type(NO_POTION);
       }
       // 炸方块
       if (area->block_id() != -1) {
