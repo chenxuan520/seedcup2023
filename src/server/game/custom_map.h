@@ -46,6 +46,7 @@ public:
     player_print_ = {"0", "1", "2", "3"};
     empty_print_ = "_";
   }
+
   inline int GetPlayerPrintByID(ID player_id, std::string &print) {
     print = player_print_[player_id % 4];
     return 0;

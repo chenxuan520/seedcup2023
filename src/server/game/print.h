@@ -39,7 +39,7 @@ public:
              << "\nseed_random:" << kSeedRandom
              << "\npotion_probability:" << kPotionDefaultProbability
              << "\ninvincible_time:" << kInvisibleDefaultTime
-             << "\nmud_num:" << kMudDefaultNum
+             << "\nmud_random:" << kMudDefaultRandom
              << "\nwall_random:" << kWallDefaultRandom << std::endl);
   }
 

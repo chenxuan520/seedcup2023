@@ -46,7 +46,7 @@ public:
   }
 
   RC Init();
-  RC InitWithCustomMap(const std::vector<std::vector<std::string>> &custom_map);
+  RC Init(const std::vector<std::vector<std::string>> &custom_map);
   RC AddPlayer(ID &player_id, const std::string &player_name = "unknown");
   RC AddAction(Action action);
   // win_players_id 为获胜者的ids
@@ -79,6 +79,7 @@ private:
   RC InitMap();
   RC InitPlayerBirth();
   RC InitCustomMap();
+  RC InitCustomMap(const std::vector<std::vector<std::string>> &custom_map);
 
 private:
   std::vector<std::vector<std::shared_ptr<Area>>> map_;

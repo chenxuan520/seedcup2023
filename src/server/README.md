@@ -21,7 +21,7 @@
   "mark_pick_potion": 100,// 捡道具得分
   "mark_bomb_mud": 10,// 炸泥块得分
   "potion_probability": 50,// 泥块产生道具概率
-  "mud_num": 70,// 泥块数量
+  "mud_random": 75,// 泥块随机生成概率
   "wall_random": 25,// 墙壁随机生成概率
   "seed_random": 0,// 随机数种子
   "result_path": "result.json",// 结果文件位置
