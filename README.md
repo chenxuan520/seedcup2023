@@ -82,7 +82,7 @@
 ## 编译方式
 > 需要linux环境,最好是ubuntu或者debain系列的,需要装有C++的环境,即(g++,cmake,make等)
 
-1. `sudo apt install libspdlog-dev`,安装所依赖的日志库
+1. `sudo apt install -y libfmt-dev libspdlog-dev`,安装所依赖的日志库
 
 2. `cd src;mkdir build;cd build;cmake ..;make`,编译项目
 

@@ -53,11 +53,10 @@ const int kPotionDefaultProbability = std::min(
     std::max(Config::get_instance().get<int>("potion_probability"), 0), 100);
 const int kInvisibleDefaultTime =
     std::max(Config::get_instance().get<int>("invincible_time"), 1);
-const int kMudDefaultNum = std::min(
-    std::max(Config::get_instance().get<int>("mud_num"), 0),
-    (int)pow(kMapDefaultSize, 2) - (int)pow((kMapDefaultSize - 1) / 2, 2) - 12);
 const int kWallDefaultRandom =
     std::min(std::max(Config::get_instance().get<int>("wall_random"), 0), 100);
+const int kMudDefaultRandom =
+    std::min(std::max(Config::get_instance().get<int>("mud_random"), 0), 100);
 const bool kIsGamePrintMap = Config::get_instance().get<bool>("game_print_map");
 const bool kIsGamePrintMapAscii =
     Config::get_instance().get<bool>("game_print_map_ascii");

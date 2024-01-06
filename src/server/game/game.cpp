@@ -58,8 +58,27 @@ RC Game::Init() {
   return RC::SUCCESS;
 }
 
-RC Game::InitWithCustomMap(
+RC Game::Init(const std::vector<std::vector<std::string>> &custom_map){
+  if (game_status_ != UNINIT) {
+    logger_->warn("game engine has init");
+    return INVALUE_OPER;
+  }
+  auto rc = InitCustomMap(custom_map);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  game_status_ = GameStatus::WAIT_PLAYER;
+  return RC::SUCCESS;
+}
+
+RC Game::InitCustomMap(
     const std::vector<std::vector<std::string>> &custom_map) {
+
+  // init
+  map_.resize(kMapDefaultSize,
+              std::vector<std::shared_ptr<Area>>(kMapDefaultSize, nullptr));
+  player_birth_.resize(4, {0, 0});
+
   if (custom_map.size() != kMapDefaultSize) {
     logger_->warn("custom map size error,should be {}*{}", kMapDefaultSize,
                   kMapDefaultSize);
@@ -67,6 +86,12 @@ RC Game::InitWithCustomMap(
   }
   auto &instance = CustomMap::GetInstance();
   for (int i = 0; i < kMapDefaultSize; i++) {
+    if (custom_map[i].size() != kMapDefaultSize) {
+      logger_->warn("custom map size error,should be {}*{} in line {},{}",
+                    kMapDefaultSize, kMapDefaultSize, i, custom_map[i].size());
+      return RC::INVALUS_CUSTOM_MAP;
+    }
+
     for (int j = 0; j < kMapDefaultSize; j++) {
       Pos pos{i, j};
       map_[i][j] = std::make_shared<Area>(pos);
@@ -108,10 +133,6 @@ RC Game::InitWithCustomMap(
 
 RC Game::InitCustomMap() {
   ASSERT(kMapDefaultSize % 2 != 0);
-  map_.resize(kMapDefaultSize,
-              std::vector<std::shared_ptr<Area>>(kMapDefaultSize, nullptr));
-  player_birth_.resize(4, {0, 0});
-
   if (game_status_ != UNINIT) {
     logger_->warn("game engine has init");
     return INVALUE_OPER;
@@ -124,7 +145,7 @@ RC Game::InitCustomMap() {
                   instance.GetLastError());
     return RC::INVALUS_CUSTOM_MAP;
   }
-  return InitWithCustomMap(custom_map);
+  return InitCustomMap(custom_map);
 }
 
 RC Game::InitPlayerBirth() {
@@ -160,10 +181,15 @@ RC Game::InitMap() {
       }
     }
   }
-  auto mud_num_max = std::min((int)block_arr.size(), kMudDefaultNum);
   // 洗牌
   std::random_shuffle(block_arr.begin(), block_arr.end());
-  for (int i = 0; i < mud_num_max; i++) {
+  for (int i = 0; i < block_arr.size(); i++) {
+
+    // 生成泥土
+    if (ProbabilityCreate() >= kMudDefaultRandom) {
+      continue;
+    }
+
     Pos pos = block_arr[i];
     auto id = CreateBlock(pos, BlockType::MUD);
     map_[pos.first][pos.second]->set_block_id(id);

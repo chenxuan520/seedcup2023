@@ -11,3 +11,4 @@ bin
 main
 packet
 __pycache*
+seedcup_*
