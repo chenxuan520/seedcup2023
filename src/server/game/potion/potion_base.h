@@ -23,9 +23,10 @@ public:
   static PotionType GenRandomPotion() {
     // 调整这个数组的比例动态调整生成的药水类型
     static std::vector<PotionType> random_potion = {
-        SHIELD,     INVINCIBLE, REBIRTH,  BOMB_RANGE, BOMB_RANGE, BOMB_RANGE,
-        BOMB_RANGE, BOMB_RANGE, BOMB_NUM, BOMB_NUM,   BOMB_NUM,   BOMB_NUM,
-        BOMB_NUM,   SPEED,      SPEED,    GLOVES,     GLOVES,
+        SHIELD,     SHIELD,     INVINCIBLE, REBIRTH,    REBIRTH,    BOMB_RANGE,
+        BOMB_RANGE, BOMB_RANGE, BOMB_RANGE, BOMB_RANGE, BOMB_RANGE, BOMB_NUM,
+        BOMB_NUM,   BOMB_NUM,   BOMB_NUM,   BOMB_NUM,   BOMB_NUM,   SPEED,
+        SPEED,      SPEED,      GLOVES,     GLOVES,     GLOVES,
     };
     static Random rand_creater(0, random_potion.size(), kSeedRandom);
     return random_potion[rand_creater.CreateRandom()];

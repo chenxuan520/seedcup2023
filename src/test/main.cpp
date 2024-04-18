@@ -1,7 +1,11 @@
-#include "snapshot_test.h"
 #include "game_test.h"
+#include "snapshot_test.h"
 #include "test.h"
 
-TEST(InitTry, Num) { EXPECT_EQ(1, 1); }
+ARGC_FUNC {
+  if (argc == 2) {
+    REGEX_FILT_TEST(argv[1]);
+  }
+}
 
-RUN
+TEST(InitTry, Num) { EXPECT_EQ(1, 1); }

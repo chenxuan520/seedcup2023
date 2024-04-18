@@ -19,7 +19,6 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <netinet/in.h>
 #include <strings.h>
@@ -27,9 +26,10 @@
 #include <sys/socket.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
+#include <unordered_map>
 
-static std::map<int, int> fd2PlayerId;
-static std::map<int, std::string> fd2msg;
+static std::unordered_map<int, int> fd2PlayerId;
+static std::unordered_map<int, std::string> fd2msg;
 
 const int EpollTcpServer::kMaxConnecNum =
     Config::get_instance().get<int>("server_max_connection_num");
@@ -134,6 +134,19 @@ int EpollTcpServer::create_epoll() {
   return epfd;
 }
 
+int EpollTcpServer::delete_epoll_events(int efd, int fd) {
+  struct epoll_event ev;
+  memset(&ev, 0, sizeof(epoll_event));
+
+  int retval = epoll_ctl(efd, EPOLL_CTL_DEL, fd, &ev);
+  if (retval < 0) {
+    logger_->error("epoll ctl failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
 int EpollTcpServer::update_epoll_events(int efd, int op, int fd, int events) {
 
   struct epoll_event ev;
@@ -144,9 +157,9 @@ int EpollTcpServer::update_epoll_events(int efd, int op, int fd, int events) {
   ev.data.fd = fd;
   logger_->info("Epoll op: {}, Epoll events: {}.",
                 op == EPOLL_CTL_ADD ? "add" : "mod",
-                (events & EPOLLIN) > 0
-                    ? "read"
-                    : (events & EPOLLOUT) > 0 ? "write" : "undentified");
+                (events & EPOLLIN) > 0    ? "read"
+                : (events & EPOLLOUT) > 0 ? "write"
+                                          : "undentified");
 
   int retval = epoll_ctl(efd, op, fd, &ev);
   if (retval < 0) {
@@ -216,6 +229,11 @@ bool EpollTcpServer::stop() {
 bool EpollTcpServer::reset() {
   logger_->info("epoll tcp server reset.");
 
+  // clean old connect
+  for (auto [fd, _] : fd2PlayerId) {
+    close_fd(fd);
+  }
+
   fd2PlayerId.clear();
   fd2msg.clear();
 
@@ -245,7 +263,7 @@ int EpollTcpServer::send_data(int fd, std::string msg) {
       return -1;
     }
     logger_->error("write header error occured on fd {}.", fd);
-    ::close(fd);
+    close_fd(fd);
   }
 
   retval = ::write(fd, msg.data(), msg.size());
@@ -254,12 +272,22 @@ int EpollTcpServer::send_data(int fd, std::string msg) {
       return -1;
     }
     logger_->error("write error occured on fd {}.", fd);
-    ::close(fd);
+    close_fd(fd);
   }
 
   logger_->info("fd {} write {} bytes data.", fd, retval);
 
   return retval;
+}
+
+int EpollTcpServer::close_fd(int fd) {
+  if (fd < 0) {
+    return -1;
+  }
+
+  delete_epoll_events(epfd_, fd);
+  ::close(fd);
+  return 0;
 }
 
 void EpollTcpServer::register_on_recv_callback(callback_recv_t callback) {
@@ -342,6 +370,7 @@ void EpollTcpServer::handle_accept() {
     retval = update_epoll_events(epfd_, EPOLL_CTL_ADD, cli_fd,
                                  EPOLLIN | EPOLLET | EPOLLRDHUP);
     if (retval < 0) {
+      logger_->error("can not add socket {} to epoll.", cli_fd);
       ::close(cli_fd);
       continue;
     }
@@ -386,13 +415,13 @@ void EpollTcpServer::handle_read(int fd) {
       return;
     }
     logger_->error("something went wrong for fd {}.", fd);
-    ::close(fd);
+    close_fd(fd);
     return;
   }
 
   if (size == 0 && offset != length) {
     logger_->info("client fd: {} close socket.", fd);
-    ::close(fd);
+    close_fd(fd);
     return;
   }
 
@@ -436,12 +465,12 @@ void EpollTcpServer::epoll_loop() {
 
       if ((events & EPOLLERR) || (events & EPOLLHUP)) {
         logger_->info("error occured to fd {}.", fd);
-        ::close(fd);
+        close_fd(fd);
       } else if (events & EPOLLRDHUP) {
         // Stream socket peer closed connection, or shut down writing half of
         // connection.
         logger_->info("Stream socket peer {} closed connections.", fd);
-        ::close(fd);
+        close_fd(fd);
       } else if (events & EPOLLIN) {
         if (fd == listenfd_) {
           handle_accept();

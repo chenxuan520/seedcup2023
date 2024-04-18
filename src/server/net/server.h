@@ -38,7 +38,7 @@ public:
 
 using callback_recv_t = std::function<void(json j, int &id)>;
 using callback_handle_timer_t =
-    std ::function<int(std::map<int, std::string> &, std::map<int, int> &)>;
+    std ::function<int(std::unordered_map<int, std::string> &, std::unordered_map<int, int> &)>;
 using callback_game_reset_t = std::function<bool()>;
 
 /**
@@ -108,6 +108,8 @@ protected:
   int set_socket_nonblock(int fd);
   int listen(int fd);
   int update_epoll_events(int efd, int op, int fd, int events);
+  int delete_epoll_events(int efd, int fd);
+  int close_fd(int fd);
 
   void handle_accept();
   void handle_read(int fd);

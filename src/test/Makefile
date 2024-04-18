@@ -7,5 +7,8 @@ header=-I../util
 link=-lfmt
 .PHONY:main
 
-main: $(source)
+main: $(source) ./test.h
 	$(cc) -g $(obj_source) -o $(obj) $(link) $(header)
+
+init:
+	wget https://gitee.com/chenxuan520/cpptest/raw/master/test.h -O test.h

@@ -43,8 +43,8 @@ void from_json(const json &j, InitReq &req);
 void from_json(const json &j, ActionReq &req);
 
 int handle_timer_intr(
-    std::map<int, std::string> &fd2msg,
-    std::map<int, int> &fd2PlayerId); // NOTE(nyw): this func would be used as a
+    std::unordered_map<int, std::string> &fd2msg,
+    std::unordered_map<int, int> &fd2PlayerId); // NOTE(nyw): this func would be used as a
                                       // callback func when a round ends
 void handle_request(json req, int &player_id);
 void handle_init(int &player_id, const std::string &player_name);

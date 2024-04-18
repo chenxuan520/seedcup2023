@@ -58,7 +58,7 @@ RC Game::Init() {
   return RC::SUCCESS;
 }
 
-RC Game::Init(const std::vector<std::vector<std::string>> &custom_map){
+RC Game::Init(const std::vector<std::vector<std::string>> &custom_map) {
   if (game_status_ != UNINIT) {
     logger_->warn("game engine has init");
     return INVALUE_OPER;

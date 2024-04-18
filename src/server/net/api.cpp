@@ -177,8 +177,8 @@ json customed_to_json(
 }
 
 // nyw add
-int handle_timer_intr(std::map<int, std::string> &fd2msg,
-                      std::map<int, int> &fd2PlayerId) {
+int handle_timer_intr(std::unordered_map<int, std::string> &fd2msg,
+                      std::unordered_map<int, int> &fd2PlayerId) {
   Game &game = Game::GetInstance();
 
   if (game.game_status() != GameStatus::WAIT_ACTION) {
