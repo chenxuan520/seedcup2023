@@ -33,7 +33,7 @@ public:
              << "\nplayer_hp:" << kPlayerDefaultHP << "\nplayer_max_hp:"
              << kPlayerDefaultMaxHP << "\nplayer_speed:" << kPlayerDefaultSpeed
              << "\nshield_time:" << kShieldDefaultTime
-             << "\nmark_kill:" << kMarkKill << "\nmark_dead:" << KMarkDead
+             << "\nmark_kill:" << kMarkKill << "\nmark_dead:" << kMarkDead
              << "\nmark_pick_potion:" << kMarkPick << "\nmark_bomb_mud:"
              << kMarkBombMud << "\ngame_max_round:" << kGameDefaultMaxRound
              << "\nseed_random:" << kSeedRandom

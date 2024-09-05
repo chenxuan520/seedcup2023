@@ -19,6 +19,7 @@
   "mark_pick_potion": 100,
   "mark_bomb_mud": 10,
   "potion_probability": 50,
+  "potion_probability_list": [5,5,2,1,2,3,3],
   "wall_random": 25,
   "mud_random": 75,
   "seed_random": 0,

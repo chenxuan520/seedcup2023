@@ -7,6 +7,7 @@
 #include <math.h>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #ifndef RELEASE
 #define ASSERT(flag) assert(flag)
@@ -39,7 +40,7 @@ const int kPlayerDefaultSpeed =
 const int kShieldDefaultTime =
     std::max(Config::get_instance().get<int>("shield_time"), 1);
 const int kMarkKill = std::max(Config::get_instance().get<int>("mark_kill"), 1);
-const int KMarkDead = std::max(Config::get_instance().get<int>("mark_dead"), 1);
+const int kMarkDead = std::max(Config::get_instance().get<int>("mark_dead"), 1);
 const int kMarkPick =
     std::max(Config::get_instance().get<int>("mark_pick_potion"), 1);
 const int kMarkBombMud =
@@ -51,6 +52,10 @@ const int kSeedRandom = Config::get_instance().get<int>("seed_random") != 0
                             : time(0);
 const int kPotionDefaultProbability = std::min(
     std::max(Config::get_instance().get<int>("potion_probability"), 0), 100);
+const std::vector<int> kPotionDefaultProbabilityList =
+    Config::get_instance()
+        .get_json()["potion_probability_list"]
+        .get<std::vector<int>>();
 const int kInvisibleDefaultTime =
     std::max(Config::get_instance().get<int>("invincible_time"), 1);
 const int kWallDefaultRandom =
@@ -78,6 +83,6 @@ enum RC {
   ACTION_TOO_MUCH,    // 一回合操作次数超过移速
   BOMB_TOO_MUCH,      // 到达放置炸弹的上限
   BOMB_NO_ALLOW,      // 无法放置,可能是地上有炸弹了
-  INVALUE_OPER,       // 无效的操作,当前状态无法操作
+  INVALUE_OPER,       // 无效的操作,当前游戏状态无法进行改操作
   INVALUS_CUSTOM_MAP, // 无效的自定义地图
 };

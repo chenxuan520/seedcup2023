@@ -158,7 +158,7 @@ private:
     HP_--;
     if (HP_ <= 0) {
       status_ = DEAD;
-      DescMark(KMarkDead);
+      DescMark(kMarkDead);
       return kMarkKill;
     }
     this->shield_time_ = kShieldDefaultTime;
