@@ -3,7 +3,21 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <type_traits>
 #include <vector>
+
+// fmt v9+ removed implicit enum-to-underlying conversion. Provide a generic
+// formatter so existing code using "{}" with enums keeps compiling without
+// touching every call site.
+template <typename E>
+struct fmt::formatter<E, std::enable_if_t<std::is_enum_v<E>, char>>
+    : fmt::formatter<std::underlying_type_t<E>> {
+  template <typename FormatContext>
+  auto format(E value, FormatContext &ctx) const {
+    return fmt::formatter<std::underlying_type_t<E>>::format(
+        static_cast<std::underlying_type_t<E>>(value), ctx);
+  }
+};
 
 // static const std::string logger_name = config.get<std::string>("loggerName");
 

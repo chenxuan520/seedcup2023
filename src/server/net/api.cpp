@@ -9,6 +9,7 @@
 #include <exception>
 #include <iostream>
 #include <map>
+#include <random>
 #include <vector>
 
 namespace API {
@@ -194,7 +195,8 @@ int handle_timer_intr(std::unordered_map<int, std::string> &fd2msg,
   // send data back to client
   auto players =
       std::vector<std::pair<int, int>>(fd2PlayerId.begin(), fd2PlayerId.end());
-  std::random_shuffle(players.begin(), players.end());
+  static std::mt19937 g_players_rng{std::random_device{}()};
+  std::shuffle(players.begin(), players.end(), g_players_rng);
 
   enum RespType {
     Action = 3,
