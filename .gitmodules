@@ -1,0 +1,4 @@
+[submodule "src/third_party/cppnet"]
+	path = src/third_party/cppnet
+	url = https://gitee.com/chenxuan520/cppnet.git
+	branch = master
