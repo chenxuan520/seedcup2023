@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <queue>
+#include <random>
 #include <vector>
 
 ID Game::CreatePlayer(Pos pos, const std::string &player_name) {
@@ -156,7 +157,9 @@ RC Game::InitPlayerBirth() {
   player_birth_[2] = {kMapDefaultSize - 1, 0};
   player_birth_[3] = {0, kMapDefaultSize - 1};
   // 插入前随机位置
-  std::random_shuffle(player_birth_.begin(), player_birth_.end());
+  static std::mt19937 g_player_birth_rng{std::random_device{}()};
+  std::shuffle(player_birth_.begin(), player_birth_.end(),
+               g_player_birth_rng);
   return RC::SUCCESS;
 }
 
@@ -182,7 +185,8 @@ RC Game::InitMap() {
     }
   }
   // 洗牌
-  std::random_shuffle(block_arr.begin(), block_arr.end());
+  static std::mt19937 g_block_arr_rng{std::random_device{}()};
+  std::shuffle(block_arr.begin(), block_arr.end(), g_block_arr_rng);
   for (int i = 0; i < block_arr.size(); i++) {
 
     // 生成泥土

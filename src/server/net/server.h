@@ -1,48 +1,42 @@
 #pragma once
 
 #include "config.h"
+#include "json.hpp"
 #include "logger.h"
-#include <arpa/inet.h>
-#include <cstddef>
+#include "server/tcp_server.hpp"
+#include "socket/socket.hpp"
+#include "timer/timer.hpp"
 #include <cstdint>
 #include <functional>
-#include <iostream>
 #include <memory>
-#include <netinet/in.h>
 #include <spdlog/spdlog.h>
 #include <string>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/timerfd.h>
-#include <sys/types.h>
-#include <thread>
-#include <vector>
+#include <unordered_map>
 
+using json = nlohmann::json;
+
+// Round / timer interval is configured in milliseconds in config.json; this
+// constant is kept for backward compatibility with code that still references
+// it (e.g. game logic) and is also used by server.cpp itself when converting
+// to (sec, nsec).
 const int MICROSECS = 1000;
 
-// const int GameMaxFrame = Config::get_instance().get<int>("GameMaxFrame"); //
-// nyw commented this line
-
-/**
- * @brief: Basic unit of send data.
- */
-class Packet {
-public:
-  int fd{-1};
-  std::string msg;
-
-  Packet() : msg("") {}
-  Packet(const std::string &msg) : msg(msg) {}
-  Packet(int fd, const std::string &msg) : fd(fd), msg(msg) {}
-}; // NOTE(nyw):这个类好像没用
-
 using callback_recv_t = std::function<void(json j, int &id)>;
-using callback_handle_timer_t =
-    std ::function<int(std::unordered_map<int, std::string> &, std::unordered_map<int, int> &)>;
+using callback_handle_timer_t = std::function<int(
+    std::unordered_map<int, std::string> &,
+    std::unordered_map<int, int> &)>;
 using callback_game_reset_t = std::function<bool()>;
 
 /**
- * @brief: Tcp server with epoll io mux.
+ * @brief: Tcp server with io-mux + timer driven game loop.
+ *
+ * Previously hand-rolled on top of <sys/epoll.h> + <sys/timerfd.h> (Linux-only
+ * and fragile). The implementation has been swapped for cppnet which provides
+ * the same epoll behaviour on Linux and falls back to kqueue / GCD on macOS,
+ * making the server cross-platform without touching the API.
+ *
+ * The class name and existing callback signatures are intentionally
+ * preserved so callers (main.cpp, api.cpp) do not have to change.
  */
 class EpollTcpServer {
 public:
@@ -54,25 +48,25 @@ public:
    */
   EpollTcpServer(std::string ip, uint16_t port,
                  std::shared_ptr<spdlog::logger> logger)
-      : ip_(ip), port(port), logger_(logger) {}
+      : ip_(std::move(ip)), port_(port), logger_(std::move(logger)) {}
 
-  EpollTcpServer(const EpollTcpServer &other) = delete;
-  EpollTcpServer &operator=(const EpollTcpServer &other) = delete;
-  EpollTcpServer(EpollTcpServer &&other) = delete;
-  EpollTcpServer &operator=(EpollTcpServer &&other) = delete;
-  ~EpollTcpServer() { stop(); };
+  EpollTcpServer(const EpollTcpServer &) = delete;
+  EpollTcpServer &operator=(const EpollTcpServer &) = delete;
+  EpollTcpServer(EpollTcpServer &&) = delete;
+  EpollTcpServer &operator=(EpollTcpServer &&) = delete;
+  ~EpollTcpServer() { stop(); }
 
   /**
-   * @brief: Init tcp server. Create epfd, bind serverfd, set serverfd non
-   * block and register serverfd to epoll.
+   * @brief: Init server (bind/listen) and arm the per-round timer.
    */
   bool init();
   /**
-   * @brief: Closes tcp server. Close epfd and serverfd.
+   * @brief: Stop the event loop and close all resources.
    */
   bool stop();
   /**
-   * @brief: Tcp server send msg to peer.
+   * @brief: Send length-prefixed (uint64_t little-endian + body) message
+   * to peer.
    */
   int send_data(int fd, std::string msg);
   /**
@@ -82,43 +76,26 @@ public:
   /**
    * @brief: Register callback function when timer ticks.
    */
-  void register_on_handle_timer_callback(
-      callback_handle_timer_t callback); // nyw add
+  void register_on_handle_timer_callback(callback_handle_timer_t callback);
   /**
-   * @brief: Unregister callback function of recv.
+   * @brief: Register callback function fired on game reset.
    */
-  void unregister_on_recv_callback();
-  /**
-   * @brief: Unregister callback function of handle_timer.
-   */
-  void unregister_on_handle_timer_callback(); // nyw add
-  /**
-   * @brief: Epoll event loop.
-   */
-
   void register_on_game_reset_callback(callback_game_reset_t callback);
+
+  void unregister_on_recv_callback();
+  void unregister_on_handle_timer_callback();
   void unregister_on_game_reset_callback();
 
+  /**
+   * @brief: Blocking event loop. Returns when stop() is called or a fatal
+   * error occurs.
+   *
+   * Name kept for backward compatibility; the underlying implementation is
+   * no longer raw epoll, but the semantics are the same.
+   */
   void epoll_loop();
 
 protected:
-  int create_epoll();
-  int create_socket();
-  int create_timer();
-  int set_socket_nonblock(int fd);
-  int listen(int fd);
-  int update_epoll_events(int efd, int op, int fd, int events);
-  int delete_epoll_events(int efd, int fd);
-  int close_fd(int fd);
-
-  void handle_accept();
-  void handle_read(int fd);
-  void handle_write(int fd); // TODO(nyw):这玩意没用就删掉吧
-  bool reset();
-  bool reset_timer(int timerfd);
-  // NOTE(nyw):这里用作每回合刷新game的状态，应该在api.h中实现，使server和game解耦，这里简单采用回调函数代替
-  // void handle_timer(int fd);
-
   static const int kMaxConnecNum;
   static const int kMaxEventNum;
   static const int kEpollTimeout;
@@ -126,28 +103,31 @@ protected:
   static const int kTimerIntervalTime;
 
 private:
-  // Dot seperated ip address. eg: 127.0.0.1
+  void on_event(cppnet::TcpServer::Event event, cppnet::TcpServer &server,
+                cppnet::Socket soc);
+  void on_accept(cppnet::Socket &soc);
+  void on_read(cppnet::TcpServer &server, cppnet::Socket &soc);
+  void on_leave(cppnet::Socket &soc);
+  void on_timer_tick();
+  bool reset();
+
   std::string ip_;
-  // port
-  uint16_t port{0};
-  // epoll file descriptor
-  int epfd_{-1};
-  // server file descriptor
-  int listenfd_{-1};
-  // time file descriptor
-  int timerfd_{-1};
-  // one loop per thread
-  std::shared_ptr<std::thread> th_{nullptr};
-  // epoll loop flag, if false then exit
-  bool loop_flag_{true};
-  // callback function when recv data
-  callback_recv_t recv_callbak_{nullptr};
-  // callback function when timer ticks
-  callback_handle_timer_t handle_timer_callbak_{nullptr};
-  // callback function for game reset
-  callback_game_reset_t game_reset_callbak_{nullptr};
-  // logger for logs
+  uint16_t port_{0};
   std::shared_ptr<spdlog::logger> logger_{nullptr};
+
+  cppnet::TcpServer server_;
+  cppnet::TimerSocket timer_;
+  int timer_fd_{-1}; // cached timer_.fd() for fast comparison in events
+
+  callback_recv_t recv_callback_{nullptr};
+  callback_handle_timer_t handle_timer_callback_{nullptr};
+  callback_game_reset_t game_reset_callback_{nullptr};
+
+  // fd -> player id mapping, populated lazily on first InitReq for a fd
+  std::unordered_map<int, int> fd2PlayerId_;
+  // fd -> outbound message accumulated during the round, drained on each
+  // timer tick
+  std::unordered_map<int, std::string> fd2msg_;
 };
 
-typedef std::shared_ptr<EpollTcpServer> EpollTcpServerPtr;
+using EpollTcpServerPtr = std::shared_ptr<EpollTcpServer>;

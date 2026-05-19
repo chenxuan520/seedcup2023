@@ -2,6 +2,7 @@
 
 #include "area.h"
 #include "json.hpp"
+#include "logger.h"
 #include <cstdio>
 #include <fmt/format.h>
 #include <memory.h>

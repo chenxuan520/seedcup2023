@@ -6,7 +6,7 @@
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <string>
-#include <termio.h>
+#include <termios.h>
 #include <unordered_map>
 #include <vector>
 // #include "net/server.h"

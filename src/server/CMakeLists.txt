@@ -9,8 +9,17 @@ set(CMAKE_CXX_STANDARD 17)
 # add_compile_options(-fsanitize=address -fsanitize=leak -fsanitize=undefined -fno-omit-frame-pointer)
 # link_libraries(-fsanitize=address -fsanitize=leak -fsanitize=undefined)
 
+# Build cppnet as a static library and expose its headers. SSL is disabled
+# because the server does not need TLS; this also avoids the openssl
+# discovery dance inside cppnet's CMakeLists on systems without OpenSSL
+# installed.
+set(ENABLE_SSL OFF CACHE BOOL "Disable cppnet SSL" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cppnet/src/lib
+                 cppnet_build)
+
 # include dir add,split by<space>
 include_directories(../util)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cppnet/src/cppnet)
 
 # link dir add
 # link_directories()
@@ -29,6 +38,6 @@ add_executable(snapshot ./snapshot_main.cpp ${DIR_SRCS})
 
 # link lib
 find_package(fmt)
-target_link_libraries(server fmt::fmt)
-target_link_libraries(term fmt::fmt)
-target_link_libraries(snapshot fmt::fmt)
+target_link_libraries(server fmt::fmt cppnet)
+target_link_libraries(term fmt::fmt cppnet)
+target_link_libraries(snapshot fmt::fmt cppnet)

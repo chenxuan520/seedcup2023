@@ -1,6 +1,6 @@
 #include "game/print.h"
 #include "game/snapshot.h"
-#include <termio.h>
+#include <termios.h>
 using namespace std;
 
 int getch(void) {

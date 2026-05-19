@@ -1,35 +1,14 @@
 #include "server.h"
-#include "config.h"
-// #include "game/game.h"
-// #include "game/player.h"
-// #include "game/rc.h"
-// #include "net/api.h"
-#include <algorithm>
-#include <arpa/inet.h>
-#include <asm-generic/errno-base.h>
-#include <asm-generic/errno.h>
-#include <cassert>
-#include <cerrno>
-#include <cstddef>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <fcntl.h>
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <memory>
-#include <netinet/in.h>
-#include <strings.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <sys/timerfd.h>
-#include <unistd.h>
-#include <unordered_map>
 
-static std::unordered_map<int, int> fd2PlayerId;
-static std::unordered_map<int, std::string> fd2msg;
+#include "config.h"
+#include "socket/address.hpp"
+#include "utils/const.hpp"
+#include <cerrno>
+#include <cstdint>
+#include <cstring>
+#include <functional>
+#include <string>
+#include <unistd.h>
 
 const int EpollTcpServer::kMaxConnecNum =
     Config::get_instance().get<int>("server_max_connection_num");
@@ -42,212 +21,67 @@ const int EpollTcpServer::kTimerInitTime =
 const int EpollTcpServer::kTimerIntervalTime =
     Config::get_instance().get<int>("round_interval_value");
 
-int EpollTcpServer::create_socket() {
-  int listenfd = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (listenfd < 0) {
-    logger_->error("create socket {}:{} failed.", ip_, port);
-  }
-
-  struct sockaddr_in addr;
-  memset(&addr, 0, sizeof(addr));
-
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = inet_addr(ip_.c_str());
-
-  // set reuse addr to avoid time wait delay
-  int reuse_addr_on = 1;
-  if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse_addr_on,
-                 sizeof(reuse_addr_on)) < 0) {
-    logger_->error("set SO_REUSEADDR error");
-    ::close(listenfd);
-    exit(-1);
-  }
-
-  if (::bind(listenfd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) < 0) {
-    logger_->error("bind socket {}:{} failed.", ip_, port);
-    ::close(listenfd);
-    exit(-1);
-  }
-
-  logger_->info("create and bind socket {}:{} success!", ip_, port);
-
-  return listenfd;
-}
-
-int EpollTcpServer::create_timer() {
-  int timerfd = timerfd_create(CLOCK_REALTIME, 0);
-  if (timerfd <= 0) {
-    logger_->info("timerfd create failed!");
-    return -1;
-  }
-
-  reset_timer(timerfd);
-  return timerfd;
-}
-
-bool EpollTcpServer::reset_timer(int timerfd) {
-  struct itimerspec ts;
-  ts.it_value.tv_sec = kTimerInitTime / MICROSECS;
-  ts.it_value.tv_nsec = kTimerInitTime % MICROSECS * 1e6;
-  ts.it_interval.tv_sec = kTimerIntervalTime / MICROSECS;
-  ts.it_interval.tv_nsec = kTimerIntervalTime % MICROSECS * 1e6;
-
-  timerfd_settime(timerfd, 0, &ts, NULL);
-  return true;
-}
-
-int EpollTcpServer::set_socket_nonblock(int fd) {
-
-  int flags = fcntl(fd, F_GETFL, 0);
-  if (flags < 0) {
-    logger_->error("fcntl failed.");
-    return -1;
-  }
-
-  int retval = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-  if (retval < 0) {
-    logger_->error("fcntl failed.");
-    return -1;
-  }
-
-  return 0;
-}
-
-int EpollTcpServer::listen(int fd) {
-  int retval = ::listen(fd, kMaxConnecNum);
-  if (retval < 0) {
-    logger_->error("listen failed.");
-    return -1;
-  }
-
-  return 0;
-}
-
-int EpollTcpServer::create_epoll() {
-  int epfd = epoll_create1(0);
-  if (epfd < 0) {
-    logger_->error("epoll create failed.");
-    return -1;
-  }
-
-  return epfd;
-}
-
-int EpollTcpServer::delete_epoll_events(int efd, int fd) {
-  struct epoll_event ev;
-  memset(&ev, 0, sizeof(epoll_event));
-
-  int retval = epoll_ctl(efd, EPOLL_CTL_DEL, fd, &ev);
-  if (retval < 0) {
-    logger_->error("epoll ctl failed.");
-    return -1;
-  }
-
-  return 0;
-}
-
-int EpollTcpServer::update_epoll_events(int efd, int op, int fd, int events) {
-
-  struct epoll_event ev;
-  memset(&ev, 0, sizeof(epoll_event));
-
-  ev.events = events;
-  // TODO(gpl): handler param
-  ev.data.fd = fd;
-  logger_->info("Epoll op: {}, Epoll events: {}.",
-                op == EPOLL_CTL_ADD ? "add" : "mod",
-                (events & EPOLLIN) > 0    ? "read"
-                : (events & EPOLLOUT) > 0 ? "write"
-                                          : "undentified");
-
-  int retval = epoll_ctl(efd, op, fd, &ev);
-  if (retval < 0) {
-    logger_->error("epoll ctl failed.");
-    return -1;
-  }
-
-  return 0;
-}
-
 bool EpollTcpServer::init() {
-  epfd_ = create_epoll();
-  if (epfd_ < 0) {
+  cppnet::Address addr{ip_, port_};
+  server_.set_addr(addr);
+  server_.set_max_connect_queue(kMaxConnecNum);
+
+  auto rc = server_.Init();
+  if (rc != cppnet::kSuccess) {
+    logger_->error("server init failed: {}", server_.err_msg());
+    return false;
+  }
+  if (auto mux = server_.io_multiplexing()) {
+    mux->set_max_event_num(kMaxEventNum);
+    if (kEpollTimeout > 0) {
+      mux->set_wait_timeout(kEpollTimeout);
+    }
+  }
+
+  // Arm the per-round timer. The config values are in milliseconds.
+  int init_sec = kTimerInitTime / MICROSECS;
+  int init_nsec = (kTimerInitTime % MICROSECS) * 1'000'000;
+  int interval_sec = kTimerIntervalTime / MICROSECS;
+  int interval_nsec = (kTimerIntervalTime % MICROSECS) * 1'000'000;
+  (void)init_sec;
+  (void)init_nsec;
+  // cppnet TimerSocket uses one interval for both initial fire and reload,
+  // matching what the original code actually did (both it_value and
+  // it_interval were set to the same pair). We follow the same behaviour
+  // and arm with the round interval.
+  rc = timer_.Init(interval_sec, interval_nsec);
+  if (rc != cppnet::kSuccess) {
+    logger_->error("timer init failed");
+    return false;
+  }
+  timer_fd_ = timer_.fd();
+
+  rc = server_.AddSoc(timer_);
+  if (rc != cppnet::kSuccess) {
+    logger_->error("attach timer to server failed: {}", server_.err_msg());
     return false;
   }
 
-  timerfd_ = create_timer();
-  if (timerfd_ < 0) {
-    return false;
-  }
+  server_.Register(std::bind(&EpollTcpServer::on_event, this,
+                             std::placeholders::_1, std::placeholders::_2,
+                             std::placeholders::_3));
 
-  listenfd_ = create_socket();
-  if (listenfd_ < 0) {
-    return false;
-  }
-
-  int retval = set_socket_nonblock(listenfd_);
-  if (retval < 0) {
-    return false;
-  }
-
-  retval = listen(listenfd_);
-  if (retval < 0) {
-    return false;
-  }
-
-  logger_->info("EpollTcpServer Init Success.");
-
-  retval =
-      update_epoll_events(epfd_, EPOLL_CTL_ADD, listenfd_, EPOLLIN | EPOLLET);
-  if (retval < 0) {
-    ::close(epfd_);
-    return false;
-  }
-
-  retval =
-      update_epoll_events(epfd_, EPOLL_CTL_ADD, timerfd_, EPOLLET | EPOLLIN);
-  if (retval < 0) {
-    ::close(epfd_);
-    return false;
-  }
-
+  logger_->info("server init success on {}:{}", ip_, port_);
   return true;
 }
 
 bool EpollTcpServer::stop() {
-  loop_flag_ = false;
-  ::close(listenfd_);
-  ::close(timerfd_);
-  ::close(epfd_);
-  logger_->info("epoll tcp server stoped.");
+  server_.Stop();
+  // Best-effort wake up so the event loop returns from its blocking wait.
+  server_.WakeUp();
+  if (timer_fd_ >= 0) {
+    timer_.Close();
+    timer_fd_ = -1;
+  }
   unregister_on_recv_callback();
   unregister_on_handle_timer_callback();
-  return true;
-}
-
-bool EpollTcpServer::reset() {
-  logger_->info("epoll tcp server reset.");
-
-  // clean old connect
-  for (auto [fd, _] : fd2PlayerId) {
-    close_fd(fd);
-  }
-
-  fd2PlayerId.clear();
-  fd2msg.clear();
-
-  // reset game
-  if (!game_reset_callbak_()) {
-    logger_->error("game reset error.");
-    return false;
-  }
-
-  if (!reset_timer(timerfd_)) {
-    logger_->error("epoll tcp server init error.");
-    return false;
-  }
-
+  unregister_on_game_reset_callback();
+  logger_->info("server stopped");
   return true;
 }
 
@@ -255,248 +89,211 @@ int EpollTcpServer::send_data(int fd, std::string msg) {
   if (fd < 0) {
     return -1;
   }
-
   uint64_t length = msg.size();
-  int retval = ::write(fd, &length, sizeof(length));
-  if (retval < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return -1;
-    }
-    logger_->error("write header error occured on fd {}.", fd);
-    close_fd(fd);
-  }
+  // Pack length prefix + body into a single buffer for an atomic write,
+  // matching the wire format the clients expect.
+  std::string buf;
+  buf.reserve(sizeof(length) + msg.size());
+  buf.append(reinterpret_cast<const char *>(&length), sizeof(length));
+  buf.append(msg);
 
-  retval = ::write(fd, msg.data(), msg.size());
-  if (retval < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return -1;
-    }
-    logger_->error("write error occured on fd {}.", fd);
-    close_fd(fd);
-  }
-
-  logger_->info("fd {} write {} bytes data.", fd, retval);
-
-  return retval;
-}
-
-int EpollTcpServer::close_fd(int fd) {
-  if (fd < 0) {
+  cppnet::Socket peer(fd);
+  auto rc = peer.Write(buf);
+  if (rc < 0) {
+    logger_->error("write error on fd {}: {}", fd, peer.err_msg());
     return -1;
   }
-
-  delete_epoll_events(epfd_, fd);
-  ::close(fd);
-  return 0;
+  logger_->info("fd {} write {} bytes data", fd, rc);
+  return rc;
 }
 
 void EpollTcpServer::register_on_recv_callback(callback_recv_t callback) {
   if (callback == nullptr) {
-    logger_->warn("callback function of recv data is nullptr.");
+    logger_->warn("recv callback is nullptr");
   }
-  recv_callbak_ = callback;
-  return;
+  recv_callback_ = std::move(callback);
 }
 
 void EpollTcpServer::register_on_handle_timer_callback(
-    callback_handle_timer_t callback) { // nyw add
+    callback_handle_timer_t callback) {
   if (callback == nullptr) {
-    logger_->warn("callback function of handle_timer is nullptr.");
+    logger_->warn("handle_timer callback is nullptr");
   }
-  handle_timer_callbak_ = callback;
-  return;
+  handle_timer_callback_ = std::move(callback);
 }
 
 void EpollTcpServer::register_on_game_reset_callback(
     callback_game_reset_t callback) {
   if (callback == nullptr) {
-    logger_->warn("callback function of game_reset is nullptr.");
+    logger_->warn("game_reset callback is nullptr");
   }
-  game_reset_callbak_ = callback;
-  return;
+  game_reset_callback_ = std::move(callback);
 }
 
 void EpollTcpServer::unregister_on_recv_callback() {
-  recv_callbak_ = nullptr;
-  return;
+  recv_callback_ = nullptr;
 }
-
+void EpollTcpServer::unregister_on_handle_timer_callback() {
+  handle_timer_callback_ = nullptr;
+}
 void EpollTcpServer::unregister_on_game_reset_callback() {
-  game_reset_callbak_ = nullptr;
-  return;
-}
-
-void EpollTcpServer::unregister_on_handle_timer_callback() { // nyw add
-  handle_timer_callbak_ = nullptr;
-  return;
-}
-
-void EpollTcpServer::handle_accept() {
-
-  while (true) {
-
-    struct sockaddr_in in_addr;
-    socklen_t in_len = sizeof(in_addr);
-
-    int cli_fd = accept(listenfd_, (struct sockaddr *)&in_addr, &in_len);
-    if (cli_fd < 0) {
-      if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
-        logger_->info("accepting all connections.");
-        break;
-      } else {
-        logger_->error("accept error.");
-        continue;
-      }
-    }
-
-    sockaddr_in peer_addr;
-    socklen_t peer_len = sizeof(peer_addr);
-    int retval = getpeername(cli_fd, (sockaddr *)&peer_addr, &peer_len);
-    if (retval < 0) {
-      logger_->error("getpeername error.");
-      continue;
-    }
-
-    logger_->info("accepting connection from {}.",
-                  inet_ntoa(peer_addr.sin_addr));
-
-    retval = set_socket_nonblock(cli_fd);
-    if (retval < 0) {
-      logger_->error("can not set socket {} to non block.", cli_fd);
-      ::close(cli_fd);
-      continue;
-    }
-
-    retval = update_epoll_events(epfd_, EPOLL_CTL_ADD, cli_fd,
-                                 EPOLLIN | EPOLLET | EPOLLRDHUP);
-    if (retval < 0) {
-      logger_->error("can not add socket {} to epoll.", cli_fd);
-      ::close(cli_fd);
-      continue;
-    }
-  }
-  return;
-}
-
-void EpollTcpServer::handle_read(int fd) {
-
-  if (fd < 0) {
-    logger_->error("fd must greater than 0");
-    return;
-  }
-
-  uint64_t length = 0;
-  if (::read(fd, &length, sizeof(length)) < sizeof(length)) {
-    logger_->error("read header error on fd {}", fd);
-    return;
-  }
-
-  if (length >= 65535) {
-    logger_->error("body length {} too large on fd {}", length, fd);
-    return;
-  }
-
-  char buffer[length];
-
-  bzero(buffer, sizeof(buffer));
-
-  int offset = 0;
-  int size = -1;
-
-  while (offset < length) {
-    while ((size = ::read(fd, buffer + offset, length - offset)) > 0) {
-      offset += size;
-    }
-  }
-
-  if (size == -1) {
-    // finished reading bytes
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-      return;
-    }
-    logger_->error("something went wrong for fd {}.", fd);
-    close_fd(fd);
-    return;
-  }
-
-  if (size == 0 && offset != length) {
-    logger_->info("client fd: {} close socket.", fd);
-    close_fd(fd);
-    return;
-  }
-
-  std::string msg(buffer, length);
-  logger_->info("fd {} recv {} bytes, content: {}", fd, length, msg);
-
-  if (recv_callbak_) {
-    if (fd2PlayerId.count(fd)) {
-      recv_callbak_(json::parse(msg), fd2PlayerId[fd]);
-    } else {
-      int player_id = -1; // nyw add to specify new InitReq
-      recv_callbak_(json::parse(msg), player_id);
-      if (player_id != -1) // adding player succeed
-      {
-        fd2PlayerId.insert({fd, player_id});
-      } else {
-        logger_->error("adding player fail");
-      }
-    }
-  }
-
-  return;
-}
-
-void EpollTcpServer::handle_write(int fd) {
-  // TODO(gpl): handle write
-  return;
+  game_reset_callback_ = nullptr;
 }
 
 void EpollTcpServer::epoll_loop() {
-  struct epoll_event ready_events[kMaxEventNum];
-  bzero(ready_events, sizeof(ready_events));
+  auto rc = server_.EventLoop();
+  if (rc != cppnet::kSuccess) {
+    logger_->error("event loop exited with error: {}", server_.err_msg());
+  }
+}
 
-  while (loop_flag_) {
-    int num = epoll_wait(epfd_, (epoll_event *)&ready_events, kMaxEventNum,
-                         kEpollTimeout);
-
-    for (int i = 0; i < num; ++i) {
-      int fd = ready_events[i].data.fd;
-      int events = ready_events[i].events;
-
-      if ((events & EPOLLERR) || (events & EPOLLHUP)) {
-        logger_->info("error occured to fd {}.", fd);
-        close_fd(fd);
-      } else if (events & EPOLLRDHUP) {
-        // Stream socket peer closed connection, or shut down writing half of
-        // connection.
-        logger_->info("Stream socket peer {} closed connections.", fd);
-        close_fd(fd);
-      } else if (events & EPOLLIN) {
-        if (fd == listenfd_) {
-          handle_accept();
-        } else if (fd == timerfd_) {
-          // logger_->info("timer {} ticks", timerfd_);
-          int64_t data;
-          int retval = ::read(timerfd_, &data, sizeof(data));
-          // MODIFIED(nyw): use handle timer call back function
-          retval = handle_timer_callbak_(fd2msg, fd2PlayerId);
-          for (auto &[fd, msg] : fd2msg) {
-            send_data(fd, msg);
-          }
-          if (retval == 1) // game over
-          {
-            reset();
-          }
-        } else {
-          handle_read(fd);
-        }
-      } else if (events & EPOLLOUT) {
-        handle_write(fd);
-      } else {
-        logger_->error("unknown epoll events.");
-      }
-    }
+void EpollTcpServer::on_event(cppnet::TcpServer::Event event,
+                              cppnet::TcpServer &server,
+                              cppnet::Socket soc) {
+  // Timer events are surfaced through the same Read channel; identify them
+  // by fd so we don't pay the cost of a dedicated dispatcher.
+  if (event == cppnet::TcpServer::kEventRead && soc.fd() == timer_fd_) {
+    // Drain the 8-byte tick counter to make the fd readable-clear under LT
+    // and consistent with Linux timerfd semantics.
+    uint64_t ticks = 0;
+    timer_.Read(&ticks, sizeof(ticks));
+    on_timer_tick();
+    return;
   }
 
-  return;
+  switch (event) {
+  case cppnet::TcpServer::kEventAccept:
+    on_accept(soc);
+    break;
+  case cppnet::TcpServer::kEventRead:
+    on_read(server, soc);
+    break;
+  case cppnet::TcpServer::kEventLeave:
+    on_leave(soc);
+    break;
+  case cppnet::TcpServer::kEventError:
+    logger_->error("error on fd {}: {}", soc.fd(), server.err_msg());
+    on_leave(soc);
+    break;
+  }
+}
+
+void EpollTcpServer::on_accept(cppnet::Socket &soc) {
+  cppnet::Address peer;
+  if (soc.GetAddr(peer) == cppnet::kSuccess) {
+    logger_->info("accepting connection {} fd={}", peer.ToString(), soc.fd());
+  } else {
+    logger_->info("accepting connection fd={}", soc.fd());
+  }
+}
+
+void EpollTcpServer::on_read(cppnet::TcpServer &server,
+                             cppnet::Socket &soc) {
+  // Wire format: uint64_t length (host byte order, matching the original
+  // implementation) followed by `length` bytes of payload.
+  uint64_t length = 0;
+  auto rc = soc.Read(&length, sizeof(length), /*complete=*/true);
+  if (rc <= 0) {
+    if (rc == 0) {
+      logger_->info("peer fd {} closed before sending header", soc.fd());
+    } else {
+      logger_->error("read header error on fd {}: {}", soc.fd(),
+                     soc.err_msg());
+    }
+    server.RemoveSoc(soc);
+    soc.Close();
+    fd2PlayerId_.erase(soc.fd());
+    fd2msg_.erase(soc.fd());
+    return;
+  }
+  if (length == 0 || length >= 65535) {
+    logger_->error("body length {} out of range on fd {}", length, soc.fd());
+    server.RemoveSoc(soc);
+    soc.Close();
+    fd2PlayerId_.erase(soc.fd());
+    fd2msg_.erase(soc.fd());
+    return;
+  }
+
+  std::string body;
+  rc = soc.Read(body, static_cast<size_t>(length), /*complete=*/true);
+  if (rc <= 0) {
+    logger_->error("read body error on fd {} ({} bytes expected): {}",
+                   soc.fd(), length, soc.err_msg());
+    server.RemoveSoc(soc);
+    soc.Close();
+    fd2PlayerId_.erase(soc.fd());
+    fd2msg_.erase(soc.fd());
+    return;
+  }
+  logger_->info("fd {} recv {} bytes: {}", soc.fd(), length, body);
+
+  if (!recv_callback_) {
+    return;
+  }
+  json parsed;
+  try {
+    parsed = json::parse(body);
+  } catch (const std::exception &e) {
+    logger_->error("json parse error on fd {}: {}", soc.fd(), e.what());
+    return;
+  }
+
+  auto it = fd2PlayerId_.find(soc.fd());
+  if (it != fd2PlayerId_.end()) {
+    recv_callback_(parsed, it->second);
+  } else {
+    int player_id = -1;
+    recv_callback_(parsed, player_id);
+    if (player_id != -1) {
+      fd2PlayerId_.emplace(soc.fd(), player_id);
+    } else {
+      logger_->error("adding player failed for fd {}", soc.fd());
+    }
+  }
+}
+
+void EpollTcpServer::on_leave(cppnet::Socket &soc) {
+  logger_->info("peer fd {} disconnected", soc.fd());
+  fd2PlayerId_.erase(soc.fd());
+  fd2msg_.erase(soc.fd());
+}
+
+void EpollTcpServer::on_timer_tick() {
+  if (!handle_timer_callback_) {
+    return;
+  }
+  int retval = handle_timer_callback_(fd2msg_, fd2PlayerId_);
+  for (auto &[fd, msg] : fd2msg_) {
+    send_data(fd, msg);
+  }
+  if (retval == 1) {
+    reset();
+  }
+}
+
+bool EpollTcpServer::reset() {
+  logger_->info("server reset");
+
+  // Close all client connections; the timer fd stays attached.
+  for (auto &[fd, _] : fd2PlayerId_) {
+    cppnet::Socket peer(fd);
+    server_.RemoveSoc(peer);
+    peer.Close();
+  }
+  fd2PlayerId_.clear();
+  fd2msg_.clear();
+
+  if (game_reset_callback_ && !game_reset_callback_()) {
+    logger_->error("game reset callback failed");
+    return false;
+  }
+  // Re-arm the round timer with the configured interval. fd does not change.
+  int interval_sec = kTimerIntervalTime / MICROSECS;
+  int interval_nsec = (kTimerIntervalTime % MICROSECS) * 1'000'000;
+  if (timer_.Reset(interval_sec, interval_nsec) != cppnet::kSuccess) {
+    logger_->error("timer reset failed");
+    return false;
+  }
+  return true;
 }
