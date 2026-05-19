@@ -25,4 +25,17 @@ jobs:
           cd build
           cmake ..
           make
+      - name: Smoke test server boot
+        run: |
+          # Run the server briefly to verify the cppnet-based net layer
+          # actually boots on Linux: bind, attach timer, enter event loop.
+          # Send SIGINT so main.cpp's signal_handler calls exit(0); this
+          # triggers spdlog's global teardown and flushes the daily log
+          # file to disk (a bare SIGTERM would lose buffered output).
+          cd src/bin
+          timeout --signal=INT 3 ./server || true
+          LOG="seedcup_$(date +%Y-%m-%d)"
+          test -f "$LOG"
+          grep -q "server init success" "$LOG"
+          echo "server boot smoke OK"
 
