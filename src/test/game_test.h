@@ -2,6 +2,7 @@
 
 #include "../server/game/game.h"
 #include "test.h"
+#include <array>
 #include <vector>
 
 // 13*13 vector
@@ -38,6 +39,22 @@ TEST(Game, Init) {
   rc = game.Init();
   MUST_EQUAL(rc, SUCCESS);
   MUST_EQUAL(game.game_status(), WAIT_PLAYER);
+}
+
+TEST(Potion, DefaultWeights) {
+  std::array<int, GLOVES + 1> counts{};
+  const auto &potion_list = PotionBase::PotionList();
+  for (const auto potion : potion_list) {
+    counts.at(static_cast<size_t>(potion))++;
+  }
+
+  const std::array<int, GLOVES + 1> expected = {
+      0, 12, 12, 4, 1, 4, 6, 6,
+  };
+  MUST_EQUAL(potion_list.size(), 45);
+  for (size_t index = 0; index < expected.size(); ++index) {
+    MUST_EQUAL(counts[index], expected[index]);
+  }
 }
 
 TEST(Game, AddPlayer) {
